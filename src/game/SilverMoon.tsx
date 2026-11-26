@@ -143,7 +143,7 @@ function itemDesc(it: Item): string { const d = idf(it); return defDesc(d, it.en
 function itemCol(it: Item): string { const d = idf(it); if (it.q) return QC[it.q] ?? '#eef2f8'; return it.en >= 7 ? '#ffd860' : d.r ? '#ffa860' : it.en >= 4 ? '#9fdcff' : d.t >= 3 ? '#c8a8ff' : '#eef2f8'; }
 function iconKey(it: Item): string { return `g${it.b}`; }
 
-interface Mon { d: number; x: number; y: number; hx: number; hy: number; hp: number; mhp: number; st: number; cd: number; wx: number; wy: number; wt: number; hit: number; dead: number; face: number; anim: number; dieT: number; atkT: number; ban: number; stun: number; slow: number; el?: boolean; wb?: boolean; sc?: number }
+interface Mon { d: number; x: number; y: number; hx: number; hy: number; hp: number; mhp: number; st: number; cd: number; wx: number; wy: number; wt: number; hit: number; dead: number; face: number; anim: number; dieT: number; atkT: number; ban: number; stun: number; slow: number; el?: boolean; wb?: boolean; sc?: number; th?: Record<string, number>; lk?: string }
 interface Pt { x: number; y: number }
 interface Pl { ab?: number; xs?: number[]; xb?: number[]; cpn?: number; skx?: Record<number, number>; bagX?: number; wareX?: number; pk?: number; mq?: number[]; bt?: BT; bc?: number; rs?: number; kc?: number; pets?: number[][]; pa?: number; dolls?: number[]; doll?: number; poly?: number; polyT?: number; mt?: number[]; dia?: number; dq?: number[]; dqd?: string; cls: number; x: number; y: number; hp: number; mp: number; lv: number; exp: number; gold: number; pots: number; blue: number; green: number; hasteT: number; tgt: Mon | null; path: number[]; dest: Pt | null; cd: number; potCd: number; mpCd: number; skCd: number; face: number; walk: number; moving: boolean; hurt: number; dead: number; swing: number; combatT: number; repath: number; stuck: number; inv: Item[]; eq: (Item | null)[]; scrolls: number; ew: number; ea: number; bw: number; ba: number; bs: number[]; lastHit: Mon | null; hitT: number; progT: number; progD: number; fails: number; lootT: number; idleT: number; lastX: number; lastY: number; loot: Drop | null; scanT: number; home: number; bank: Item[]; q: number[]; blessT: number; sk: number[]; hb: number[]; scd: Record<number, number>; bf: Record<string, number> }
 interface Proj { x: number; y: number; t: Mon; k: number; mult: number; sp: number; life: number; a: number; sk?: number; dl?: number }
@@ -860,6 +860,7 @@ function petExp(g: G, v: number): void {
 function petDmg(g: G, t: Mon, dmg: number, col: string): void {
   if (t.dead > 0) return;
   t.hp -= dmg; t.hit = 0.12; if (t.st !== 1) t.st = 1;
+  addThreat(t, 'p', dmg);
   if (t.wb) WBS.P += dmg;
   addText(g, t.x + rnd(-6, 6), t.y - md(t).r * 1.6, String(dmg), col, 13); emit(g, t.x, t.y - md(t).r, 5, col, 100, 0.3, 2.5);
   if (t.hp <= 0) killMon(g, t);
@@ -941,7 +942,7 @@ function hitMon(g: G, m: Mon, mult: number): void {
   if (Math.random() < miss) { addText(g, m.x, hy, "未命中", "#c0c0c0", 13); return; }
   const crit = Math.random() < s.crit;
   const dmg = Math.max(1, Math.round((s.atk * rnd(0.85, 1.25) - d.def * (m.sc ?? 1) * 0.6) * mult * s.dmgB * (crit ? 1.6 : 1)));
-  m.hp -= dmg; m.hit = 0.12; sfx(crit ? 'crit' : 'hit'); if (m.wb) WBS.P += dmg;
+  m.hp -= dmg; m.hit = 0.12; sfx(crit ? 'crit' : 'hit'); addThreat(m, 'p', dmg); if (m.wb) WBS.P += dmg;
   if (s.vamp > 0) g.p.hp = Math.min(s.mhp, g.p.hp + dmg * s.vamp);
   if (m.st !== 1) m.st = 1;
   addText(g, m.x + rnd(-6, 6), hy, crit ? `${dmg}!` : String(dmg), crit ? "#ffe830" : "#ffffff", crit ? 30 : 15);
@@ -1036,6 +1037,73 @@ function die(g: G, by: string): void {
   p.exp -= loss;
   addLog(g, `你被 ${by} 擊倒了……損失 ${loss} 經驗。`, "#ff7070");
 }
+function addThreat(m: Mon, key: string, dmg: number): void {
+  if (md(m).b < 1 || dmg <= 0) return;
+  const th = m.th ?? (m.th = {});
+  th[key] = (th[key] ?? 0) + dmg;
+}
+function thAlive(g: G, key: string): boolean {
+  if (key === 'p') return g.p.dead <= 0 && zoneAt(g.p.x, g.p.y) !== -1;
+  if (key.charAt(0) !== 'b') return false;
+  const b = g.bots[Number(key.slice(1))];
+  return !!b && (b.dd ?? 0) <= 0 && b.st !== 3 && (WID !== 0 || zoneAt(b.x, b.y) !== -1);
+}
+function bossLock(g: G, m: Mon): string {
+  const th = m.th ?? {};
+  let best = '', bestV = 0;
+  for (const k of Object.keys(th)) {
+    const v = th[k] ?? 0;
+    if (v <= 0 || !thAlive(g, k)) continue;
+    if (v > bestV) { best = k; bestV = v; }
+  }
+  if (!best) return '';
+  const cur = m.lk && thAlive(g, m.lk) ? m.lk : '';
+  if (cur && cur !== best && bestV < (th[cur] ?? 0) * 1.1) return cur;
+  return best;
+}
+function monAim(g: G, m: Mon): { x: number; y: number; k: string } | null {
+  const d = md(m), p = g.p, pSafe = p.dead > 0 || zoneAt(p.x, p.y) === -1;
+  if (!d.b) return pSafe ? null : { x: p.x, y: p.y, k: 'p' };
+  const lk = bossLock(g, m);
+  if (lk === 'p' && !pSafe) { m.lk = lk; return { x: p.x, y: p.y, k: 'p' }; }
+  if (lk.charAt(0) === 'b') {
+    const b = g.bots[Number(lk.slice(1))];
+    if (b && (b.dd ?? 0) <= 0 && b.st !== 3) { m.lk = lk; return { x: b.x, y: b.y, k: lk }; }
+  }
+  const fighters: { x: number; y: number; k: string; dd: number }[] = [];
+  if (WID === 0) g.bots.forEach((b: Bot, i: number) => {
+    if ((b.dd ?? 0) > 0 || b.st === 3 || zoneAt(b.x, b.y) === -1) return;
+    const dd = Math.hypot(b.x - m.x, b.y - m.y);
+    if (dd < 280 || b.tg === m) fighters.push({ x: b.x, y: b.y, k: `b${i}`, dd });
+  });
+  if (fighters.length) {
+    fighters.sort((a, b) => a.dd - b.dd);
+    const f = fighters[0]; if (f) { m.lk = f.k; return f; }
+  }
+  if (pSafe) return null;
+  const pd = Math.hypot(p.x - m.x, p.y - m.y);
+  if (pd < 220) { m.lk = 'p'; return { x: p.x, y: p.y, k: 'p' }; }
+  return null;
+}
+function monHitBot(g: G, m: Mon, b: Bot, mult: number): void {
+  if ((b.dd ?? 0) > 0 || b.st === 3) return;
+  const d = md(m), mx = bMhp(b);
+  m.atkT = 0.28;
+  const dmg = Math.max(1, Math.round((d.atk * (m.sc ?? 1) * mult * (m.el ? 1.6 : 1) * rnd(0.8, 1.2) - bDef(b) * 0.7)));
+  b.php = (b.php ?? mx) - dmg;
+  addText(g, b.x + rnd(-6, 6), b.y - 58, `-${dmg}`, '#ffb0a0', 12);
+  emit(g, b.x, b.y - 20, 5, '#ff6060', 80, 0.3, 2);
+  if ((b.php ?? 0) <= 0) {
+    emit(g, b.x, b.y - 20, 22, '#ff4040', 140, 0.7, 3);
+    b.dd = 20; b.php = 0; b.tg = null; b.ag = 0; b.vs = -1;
+    if (m.lk === `b${g.bots.indexOf(b)}`) m.lk = '';
+    addLog(g, `${d.n} 擊殺了 ${b.n}！`, '#ffb080');
+  }
+}
+function monStrike(g: G, m: Mon, aim: { x: number; y: number; k: string }, mult: number): void {
+  if (aim.k === 'p') monHit(g, m, mult);
+  else { const b = g.bots[Number(aim.k.slice(1))]; if (b) monHitBot(g, m, b, mult); }
+}
 function monHit(g: G, m: Mon, mult: number): void {
   const p = g.p, d = md(m), s = stats(p);
   if (p.dead > 0) return;
@@ -1044,7 +1112,7 @@ function monHit(g: G, m: Mon, mult: number): void {
   if (Math.random() < s.dodge) { addText(g, p.x, p.y - 44, "閃避", "#a0e0ff", 13); return; }
   const dmg = Math.max(1, Math.round((d.atk * (m.sc ?? 1) * mult * (m.el ? 1.6 : 1) * rnd(0.8, 1.2) - s.def * 0.7) * (1 - s.mr)));
   p.hp -= dmg; p.hurt = 0.25; sfx('hurt');
-  if ((p.bf['cb'] ?? 0) > 0 && Math.random() < 0.25 + 0.025 * (bfL(p, 'cb') - 1) && m.dead <= 0) { m.hp -= dmg * 2; m.hit = 0.12; addText(g, m.x, m.y - d.r * 1.6, `反擊 ${dmg * 2}`, '#ffb040', 14); ring(g, p.x, p.y - 12, '#ffb040', 90, 0.3); if (m.hp <= 0) killMon(g, m); }
+  if ((p.bf['cb'] ?? 0) > 0 && Math.random() < 0.25 + 0.025 * (bfL(p, 'cb') - 1) && m.dead <= 0) { m.hp -= dmg * 2; m.hit = 0.12; addThreat(m, 'p', dmg * 2); addText(g, m.x, m.y - d.r * 1.6, `反擊 ${dmg * 2}`, '#ffb040', 14); ring(g, p.x, p.y - 12, '#ffb040', 90, 0.3); if (m.hp <= 0) killMon(g, m); }
   addText(g, p.x + rnd(-6, 6), p.y - 44, `-${dmg}`, "#ff5050", 15);
   emit(g, p.x, p.y - 15, 6, "#ff4040", 90, 0.35, 2.5);
   if (p.hp <= 0) die(g, d.n);
@@ -1287,6 +1355,38 @@ function gearTotal(p: Pl): number { return p.eq.reduce((a: number, it: Item | nu
 function enTotal(p: Pl): number { return p.eq.reduce((a: number, it: Item | null) => a + (it ? it.en : 0), 0); }
 function botGS(b: Bot): number { const worn = Math.min(13, 5 + Math.floor(b.lv / 6)), t = clamp(Math.floor(b.lv / 12), 0, 5); return Math.round(worn * tierScore(t) * 1.25 + (b.en ?? 0) * 4.5); }
 let PVP = -1, PVPC = -1, PVPCT = 0;
+const PKATK: Record<number, { dmg: number; t: number }> = {};
+function pkNote(g: G, bi: number, dmg: number): void {
+  const rec = PKATK[bi];
+  if (!rec || g.time - rec.t > 6) PKATK[bi] = { dmg: Math.max(0, dmg), t: g.time };
+  else { rec.dmg += Math.max(0, dmg); rec.t = g.time; }
+}
+function pkShow(g: G): Bot | null {
+  if (g.p.dead > 0) return null;
+  let bestI = -1, bestD = -1, lateI = -1, lateT = -1, lateD = 0;
+  for (const ks of Object.keys(PKATK)) {
+    const i = Number(ks), rec = PKATK[i];
+    if (!rec || g.time - rec.t > 6) continue;
+    const b = g.bots[i];
+    if (!b || (b.dd ?? 0) > 0 || b.st === 3 || zoneAt(b.x, b.y) === -1 || zoneAt(g.p.x, g.p.y) === -1) continue;
+    if (rec.dmg > bestD || (rec.dmg === bestD && rec.t >= lateT)) { bestI = i; bestD = rec.dmg; }
+    if (rec.t > lateT) { lateI = i; lateT = rec.t; lateD = rec.dmg; }
+  }
+  const i = lateI >= 0 && lateD >= bestD * 0.9 ? lateI : bestI;
+  return i >= 0 ? (g.bots[i] ?? null) : null;
+}
+function pkRetaliate(g: G): void {
+  const b = pkShow(g); if (!b) return;
+  const i = g.bots.indexOf(b);
+  if (i < 0 || !pvpOk(g, b)) { addLog(g, '現在無法反擊（城鎮內禁止 PvP，或對方已離開）。', '#ff9090'); return; }
+  if (PVP === i) return;
+  PVP = i; PVPC = -1;
+  g.p.tgt = null; g.p.path = []; g.p.dest = null; g.p.repath = 0;
+  addLog(g, `【PvP】你向 ${b.n} 反擊！`, '#ff8080');
+  g.banner = { t: `反擊 ${b.n}！`, c: '#ff8080', l: 1.6 };
+}
+function nearWB(b: Bot): boolean { const m = WBS.m; return !!m && m.dead <= 0 && WID === 0 && Math.hypot(m.x - b.x, m.y - b.y) < 700; }
+
 function pvpOk(g: G, b: Bot): boolean { return WID === 0 && b.st === 2 && (b.dd ?? 0) <= 0 && zoneAt(b.x, b.y) !== -1 && zoneAt(g.p.x, g.p.y) !== -1 && g.p.dead <= 0; }
 function pickBot(g: G, wx: number, wy: number): number { if (WID !== 0) return -1; let bi = -1, bd = 22; g.bots.forEach((b: Bot, i: number) => { if ((b.dd ?? 0) > 0 || b.st === 3) return; const d = Math.hypot(b.x - wx, clamp(wy, b.y - 50, b.y - 6) - wy); if (d < bd) { bd = d; bi = i; } }); return bi; }
 function pvpStep(g: G, dt: number): void {
@@ -1335,9 +1435,11 @@ function botPvp(g: G, b: Bot, dt: number, near: boolean): boolean {
     b.acd = ([0.95, 0.85, 1.05][b.cls] ?? 1) * 1.2; b.swing = 0.22;
     const s = stats(p);
     if (b.cls !== 0) for (let k = 0; k < 6; k++) emit(g, b.x + (p.x - b.x) * (k / 6), b.y - 24 + (p.y - b.y) * (k / 6), 2, b.cls === 2 ? '#b07cff' : '#ffe0a0', 40, 0.25, 2);
-    if (Math.random() < s.dodge) { addText(g, p.x, p.y - 44, '閃避', '#a0e0ff', 13); return true; }
+    const bi = g.bots.indexOf(b);
+    if (Math.random() < s.dodge) { pkNote(g, bi, 0); addText(g, p.x, p.y - 44, '閃避', '#a0e0ff', 13); return true; }
     const dmg = Math.max(1, Math.round((bAtk(b) * rnd(0.8, 1.2) - s.def * 0.7) * (1 - s.mr)));
     p.hp -= dmg; p.hurt = 0.25; p.combatT = 0; sfx('hurt'); addText(g, p.x, p.y - 44, `-${dmg}`, '#ff7070', 13);
+    pkNote(g, bi, dmg);
     if (p.hp <= 0) { die(g, `玩家 ${b.n}`); b.kc = (b.kc ?? 0) + 1; b.ag = 0; PVP = -1; botSay(g, b, '哼，自找的。', true); }
   }
   return true;
@@ -1378,7 +1480,7 @@ function botMove(b: Bot, tx: number, ty: number, sp: number, dt: number): boolea
 function botHit(g: G, b: Bot, m: Mon, dmg: number): void {
   if (m.dead > 0) return;
   const d = md(m);
-  m.hp -= dmg; m.hit = 0.1; if (m.wb) { WBS.B += dmg; WBS.D[b.n] = (WBS.D[b.n] ?? 0) + dmg; }
+  m.hp -= dmg; m.hit = 0.1; if (m.st !== 1) m.st = 1; addThreat(m, `b${g.bots.indexOf(b)}`, dmg); if (m.wb) { WBS.B += dmg; WBS.D[b.n] = (WBS.D[b.n] ?? 0) + dmg; }
   addText(g, m.x + rnd(-6, 6), m.y - d.r * 1.6, String(dmg), '#b8c8d8', 11);
   emit(g, m.x, m.y - d.r, 4, '#ffeedd', 90, 0.3, 2);
   if (m.hp <= 0 && m.wb) { killMon(g, m); return; }
@@ -1427,14 +1529,17 @@ const AGS = ['看招！', '這片地圖是我的！', '把你的裝備交出來�
 function botAggro(g: G, b: Bot, bi: number, dt: number, near: boolean): void {
   const p = g.p;
   if (b.ag || (b.dd ?? 0) > 0 || (b.vs ?? -1) >= 0 || zoneAt(b.x, b.y) === -1) return;
-  if (AIPK && near && PVP < 0 && p.dead <= 0 && zoneAt(p.x, p.y) !== -1 && b.pt < 0 && !g.bots.some((o: Bot) => o.ag) && Math.hypot(p.x - b.x, p.y - b.y) < 600 && Math.random() < dt / 900) {
+  const wbHere = nearWB(b);
+  const pRate = wbHere ? 18000 : 900, bRate = wbHere ? 8000 : (near ? 700 : 1800);
+  if (AIPK && near && PVP < 0 && p.dead <= 0 && zoneAt(p.x, p.y) !== -1 && b.pt < 0 && !g.bots.some((o: Bot) => o.ag) && Math.hypot(p.x - b.x, p.y - b.y) < 600 && Math.random() < dt / pRate) {
     b.ag = 1; b.acd = 1.2; b.agT = 45; b.tg = null;
     botSay(g, b, AGS[Math.floor(Math.random() * AGS.length)] ?? '', true);
-    addLog(g, `【PK】${b.n}（${CLN[b.cls] ?? ''} Lv.${b.lv}）對你發動攻擊！回城可以躲避，或點擊他反擊。`, '#ff8080');
+    pkNote(g, bi, 0);
+    addLog(g, `【PK】${b.n}（${CLN[b.cls] ?? ''} Lv.${b.lv}）對你發動攻擊！點畫面中央的劍可立即反擊。`, '#ff8080');
     g.banner = { t: `${b.n} 對你發動攻擊！`, c: '#ff8080', l: 2.2 };
     return;
   }
-  if (Math.random() < dt / (near ? 700 : 1800)) {
+  if (Math.random() < dt / bRate) {
     const oi = g.bots.findIndex((o: Bot, i: number) => i !== bi && o.st === 2 && o.z === b.z && !o.ag && (o.dd ?? 0) <= 0 && (o.vs ?? -1) < 0 && o.pt !== bi && b.pt !== i && zoneAt(o.x, o.y) !== -1);
     const o = g.bots[oi]; if (!o) return;
     const onear = Math.abs(o.x - p.x) < 1400 && Math.abs(o.y - p.y) < 1100;
@@ -1483,6 +1588,7 @@ function stepBots(g: G, dt: number): void {
   g.bots.forEach((b: Bot, bi: number) => {
     b.sayT = Math.max(0, b.sayT - dt); b.swing = Math.max(0, b.swing - dt); b.cd -= dt; b.tm -= dt; b.mv = false;
     const near = ow && Math.abs(b.x - p.x) < 1400 && Math.abs(b.y - p.y) < 1100;
+    if (WBS.m && WBS.m.dead <= 0 && nearWB(b) && b.ag && !(PVP >= 0 && g.bots[PVP] === b)) { b.ag = 0; b.tg = WBS.m; }
     if (botPvp(g, b, dt, near)) return;
     if (b.st === 3) { botExp(g, b, (needExp(b.lv) * dt) / (150 + b.lv * 16), false); b.kc = (b.kc ?? 0) + dt * 0.15; if (b.tm <= 0) { const D = DUNS[b.dn ?? 0]; b.st = 0; b.tm = rnd(30, 90); b.dn = -1; b.pt = -1; botWarp(g, b, townPt(Math.random() < 0.5 ? 0 : 1), false); if (Math.random() < 0.6) addLog(g, `【玩家】${b.n} 從${D?.n ?? '副本'}凱旋歸來（Lv.${b.lv}）。`, '#c8e0ff'); } return; }
     if ((b.vs ?? -1) >= 0 && botDuel(g, b, bi, dt, near)) return;
@@ -1780,7 +1886,7 @@ function update(g: G, inp: Inp, dt: number): void {
     if (m.dead > 0) {
       m.dieT = Math.max(0, m.dieT - dt);
       m.dead -= dt;
-      if (m.dead <= 0) { m.x = m.hx; m.y = m.hy; m.hp = m.mhp; m.st = 0; m.dieT = 0; ring(g, m.x, m.y - d.r, "#ffffff", 60, 0.4); }
+      if (m.dead <= 0) { m.x = m.hx; m.y = m.hy; m.hp = m.mhp; m.st = 0; m.dieT = 0; m.th = undefined; m.lk = ''; ring(g, m.x, m.y - d.r, "#ffffff", 60, 0.4); }
       continue;
     }
     if (m.st === 0 && Math.abs(m.x - p.x) + Math.abs(m.y - p.y) > 1800) continue;
@@ -1791,28 +1897,30 @@ function update(g: G, inp: Inp, dt: number): void {
     const sl = m.slow > 0 ? 0.5 : 1;
     const step = (ux: number, uy: number, v: number): void => { moveBy(m, ux * v * sl, uy * v * sl, d.r * 0.8, true); if (Math.abs(ux) > 0.1) m.face = ux < 0 ? -1 : 1; };
     if (m.st === 0) {
-      if (d.ag && !pSafe && dist < (d.b ? 220 : 150)) m.st = 1;
+      if (d.b) { const aim0 = monAim(g, m); if (aim0 && Math.hypot(aim0.x - m.x, aim0.y - m.y) < 220) m.st = 1; }
+      else if (d.ag && !pSafe && dist < 150) m.st = 1;
       m.wt -= dt;
       if (m.wt <= 0) { m.wt = rnd(2, 5); m.wx = m.hx + rnd(-70, 70); m.wy = m.hy + rnd(-70, 70); }
       const wx = m.wx - m.x, wy = m.wy - m.y, wd = Math.hypot(wx, wy);
       if (wd > 4) step(wx / wd, wy / wd, d.sp * 0.35 * dt); else m.anim -= dt * 0.7;
     } else if (m.st === 1) {
-      const reach = d.r + PR + 8;
-      if (pSafe || Math.hypot(m.x - m.hx, m.y - m.hy) > 480) m.st = 2;
-      else if (dist > reach) step(dx / dist, dy / dist, d.sp * dt);
-      else { m.face = dx < 0 ? -1 : 1; if (m.cd <= 0) { m.cd = d.b ? 1.5 : 1.8; monHit(g, m, 1); } }
+      const aim = monAim(g, m), adx = aim ? aim.x - m.x : 0, ady = aim ? aim.y - m.y : 0, adist = Math.hypot(adx, ady) || 1;
+      const reach = d.r + (aim && aim.k === 'p' ? PR : 8) + 8;
+      if (!aim || Math.hypot(m.x - m.hx, m.y - m.hy) > (m.wb ? 1400 : d.b ? 800 : 480)) m.st = 2;
+      else if (adist > reach) step(adx / adist, ady / adist, d.sp * dt);
+      else { m.face = adx < 0 ? -1 : 1; if (m.cd <= 0) { m.cd = d.b ? 1.5 : 1.8; monStrike(g, m, aim, 1); } }
       if (d.b && m.st === 1) {
         m.wt -= dt;
         if (m.wt <= 0) {
           m.wt = 5; ring(g, m.x, m.y, "#ff5030", 300, 0.6); ring(g, m.x, m.y, "#ffb040", 200, 0.5); emit(g, m.x, m.y - 10, 40, "#ff6030", 260, 0.7, 4); g.shake = 0.3;
           addLog(g, `${d.n}釋放了震擊！`, '#ff8060');
-          if (dist < 170) monHit(g, m, 1.3);
+          if (aim && adist < 170) monStrike(g, m, aim, 1.3);
         }
       }
     } else {
       const hx = m.hx - m.x, hy = m.hy - m.y, hd = Math.hypot(hx, hy);
       m.hp = Math.min(m.mhp, m.hp + m.mhp * 0.3 * dt);
-      if (hd < 10) m.st = 0; else step(hx / hd, hy / hd, d.sp * 1.4 * dt);
+      if (hd < 10) { m.st = 0; if (d.b) { m.th = undefined; m.lk = ''; } } else step(hx / hd, hy / hd, d.sp * 1.4 * dt);
     }
   }
   for (const pr of g.proj) {
@@ -6437,6 +6545,18 @@ export default function App() {
             })}
           </div>
         )}
+        {scr === "play" && g && !pause && !askTitle && (() => {
+          const atk = pkShow(g);
+          if (!atk) return null;
+          return (
+            <button type="button" onPointerDown={(e: { stopPropagation: () => void; preventDefault: () => void }) => { e.stopPropagation(); e.preventDefault(); }} onClick={(e: { stopPropagation: () => void }) => { e.stopPropagation(); pkRetaliate(g); bump(); }}
+              style={{ position: 'absolute', left: '50%', top: '40%', transform: 'translate(-50%, -50%)', zIndex: 9, pointerEvents: 'auto', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 18px', borderRadius: 14, border: '2px solid #ff6060', background: 'rgba(70,10,12,0.94)', color: '#ffe8e0', cursor: 'pointer', fontFamily: theme.font.family, boxShadow: '0 0 22px rgba(255,50,40,0.55)', animation: 'pkpulse 1.1s ease-in-out infinite' }}>
+              <style>{'@keyframes pkpulse{0%,100%{box-shadow:0 0 14px rgba(255,50,40,0.4)}50%{box-shadow:0 0 26px rgba(255,80,50,0.85)}}'}</style>
+              <span style={{ fontSize: 28, lineHeight: 1, filter: 'drop-shadow(0 0 4px #ff4040)' }}>⚔</span>
+              <span style={{ textAlign: 'left' }}><b style={{ display: 'block', fontSize: 16 }}>正在被 {atk.n} 攻擊</b><span style={{ fontSize: 11, opacity: 0.8 }}>點我反擊（掛機中也可）</span></span>
+            </button>
+          );
+        })()}
         {scr === "play" && g && !pause && !askTitle && !(narrow && panel !== "none") && (() => {
           const aq = QD.map((q: QDef, i: number) => ({ q, i, v: g.p.q[i] ?? 0 })).filter((o: { q: QDef; i: number; v: number }) => o.v > 0);
           const wbm = WBS.m && WBS.m.dead <= 0 && WID === 0 ? WBS.m : null;
