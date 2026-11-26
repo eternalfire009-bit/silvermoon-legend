@@ -123,6 +123,8 @@ function rollQ(it: Item, boss: boolean, fq?: number): void {
   if ((it.q ?? 0) >= 4) it.af.push(([10, 11, 12][Math.floor(Math.random() * 3)] ?? 10) * 100 + (it.q === 5 ? 4 : 2) + Math.floor(Math.random() * 4));
 }
 function invCap(p: Pl): number { return 150 + 10 * (p.bagX ?? 0); }
+function stackN(p: Pl): number { return [p.pots, p.green, p.blue, p.scrolls, p.ew, p.ea, p.bw, p.ba, p.ab ?? 0, p.rs ?? 0, p.cpn ?? 0, ...(p.xs ?? []), ...(p.mt ?? [])].filter((n: number) => n > 0).length; }
+function invUsed(p: Pl): number { return p.inv.length + stackN(p); }
 function bankCap(p: Pl): number { return 80 + 20 * (p.wareX ?? 0); }
 function itemPrice(it: Item): number { return idf(it).p; }
 function sellPrice(it: Item): number { return Math.round((itemPrice(it) / 4) * (1 + it.en * 0.5) * (1 + (it.q ?? 0) * 0.6)); }
@@ -145,7 +147,7 @@ function iconKey(it: Item): string { return `g${it.b}`; }
 
 interface Mon { d: number; x: number; y: number; hx: number; hy: number; hp: number; mhp: number; st: number; cd: number; wx: number; wy: number; wt: number; hit: number; dead: number; face: number; anim: number; dieT: number; atkT: number; ban: number; stun: number; slow: number; el?: boolean; wb?: boolean; sc?: number; th?: Record<string, number>; lk?: string }
 interface Pt { x: number; y: number }
-interface Pl { ab?: number; xs?: number[]; xb?: number[]; cpn?: number; skx?: Record<number, number>; bagX?: number; wareX?: number; pk?: number; mq?: number[]; bt?: BT; bc?: number; rs?: number; kc?: number; pets?: number[][]; pa?: number; dolls?: number[]; doll?: number; poly?: number; polyT?: number; mt?: number[]; dia?: number; dq?: number[]; dqd?: string; cls: number; x: number; y: number; hp: number; mp: number; lv: number; exp: number; gold: number; pots: number; blue: number; green: number; hasteT: number; tgt: Mon | null; path: number[]; dest: Pt | null; cd: number; potCd: number; mpCd: number; skCd: number; face: number; walk: number; moving: boolean; hurt: number; dead: number; swing: number; combatT: number; repath: number; stuck: number; inv: Item[]; eq: (Item | null)[]; scrolls: number; ew: number; ea: number; bw: number; ba: number; bs: number[]; lastHit: Mon | null; hitT: number; progT: number; progD: number; fails: number; lootT: number; idleT: number; lastX: number; lastY: number; loot: Drop | null; scanT: number; home: number; bank: Item[]; q: number[]; blessT: number; sk: number[]; hb: number[]; scd: Record<number, number>; bf: Record<string, number> }
+interface Pl { lr?: number; ab?: number; xs?: number[]; xb?: number[]; cpn?: number; skx?: Record<number, number>; bagX?: number; wareX?: number; pk?: number; mq?: number[]; bt?: BT; bc?: number; rs?: number; kc?: number; pets?: number[][]; pa?: number; dolls?: number[]; doll?: number; poly?: number; polyT?: number; mt?: number[]; dia?: number; dq?: number[]; dqd?: string; cls: number; x: number; y: number; hp: number; mp: number; lv: number; exp: number; gold: number; pots: number; blue: number; green: number; hasteT: number; tgt: Mon | null; path: number[]; dest: Pt | null; cd: number; potCd: number; mpCd: number; skCd: number; face: number; walk: number; moving: boolean; hurt: number; dead: number; swing: number; combatT: number; repath: number; stuck: number; inv: Item[]; eq: (Item | null)[]; scrolls: number; ew: number; ea: number; bw: number; ba: number; bs: number[]; lastHit: Mon | null; hitT: number; progT: number; progD: number; fails: number; lootT: number; idleT: number; lastX: number; lastY: number; loot: Drop | null; scanT: number; home: number; bank: Item[]; q: number[]; blessT: number; sk: number[]; hb: number[]; scd: Record<number, number>; bf: Record<string, number> }
 interface Proj { x: number; y: number; t: Mon; k: number; mult: number; sp: number; life: number; a: number; sk?: number; dl?: number }
 function hand(p: Pl): { x: number; y: number; dl: number } { const dir = Math.cos(p.face) < -0.01 ? -1 : 1; const sy = Math.sin(p.face); return p.cls === 1 ? (sy > 0.92 ? { x: p.x + dir, y: p.y - 31, dl: 0.12 } : sy < -0.92 ? { x: p.x + dir, y: p.y - 72, dl: 0.12 } : { x: p.x + dir * 19, y: p.y - 35, dl: 0.12 }) : p.cls === 2 ? { x: p.x + dir * 30, y: p.y - 62, dl: 0.08 } : { x: p.x, y: p.y - 26, dl: 0 }; }
 interface Part { x: number; y: number; vx: number; vy: number; l: number; m: number; c: string; s: number }
@@ -208,6 +210,9 @@ const WBS = { P: 0, B: 0, T: 300, L: 0, m: null as Mon | null, D: {} as Record<s
 function wbLoad(): void { try { const v = Number((typeof localStorage !== 'undefined' ? localStorage.getItem('sm_wbt') : null) ?? 0); if (v > 0) WBS.T = clamp((v - Date.now()) / 1000, 20, 300); } catch { /* ignore */ } }
 function wbSet(sec: number): void { WBS.T = sec; try { localStorage.setItem('sm_wbt', String(Date.now() + sec * 1000)); } catch { /* ignore */ } }
 wbLoad();
+const PVR = [{ k: 10, n: '見習鬥士', a: 2, h: 30, c: 0, ac: 0, d: 0 }, { k: 30, n: '嗜血戰士', a: 4, h: 60, c: 1, ac: 0, d: 0 }, { k: 50, n: '血色騎士', a: 6, h: 100, c: 2, ac: 2, d: 0 }, { k: 100, n: '屠殺之王', a: 10, h: 150, c: 3, ac: 4, d: 5 }];
+function pvpRank(pk: number): number { let r = -1; PVR.forEach((t: { k: number }, i: number) => { if (pk >= t.k) r = i; }); return r; }
+function pvText(i: number): string { const t = PVR[i]; if (!t) return '無'; return [`攻擊 +${t.a}`, `生命 +${t.h}`, t.c ? `暴擊 +${t.c}%` : '', t.ac ? `AC -${t.ac}` : '', t.d ? `PvP 傷害 +${t.d}%` : ''].filter((s: string) => s !== '').join('、'); }
 function rankOf(kc: number): number { let r = 0; RKT.forEach((t: number, i: number) => { if (kc >= t) r = i; }); return r; }
 interface PSp { n: string; m: number; c: number; dia: number; sk: string; mu: number; aoe: number; d: string }
 const PSP: PSp[] = [
@@ -700,6 +705,7 @@ function stats(p: Pl): St {
   { const dw = p.doll ?? -1; if (dw === 0) ac += 3; else if (dw === 1) watk += 3; else if (dw === 2) { mpR += 0.5; hp += 40; } else if (dw === 3) { crit += 0.04; mpR += 0.4; } else if (dw === 4) { dmgB += 0.06; hp += 100; } }
   if ((p.polyT ?? 0) > 0 && (p.poly ?? -1) >= 0) { const f = p.poly ?? 0; dmgB += 0.03 * (f + 1); ac += f; spd += 0.03 * f; }
   { const rb = rkBonus(rankOf(p.kc ?? 0)); hp += rb[0] ?? 0; mp += rb[1] ?? 0; watk += rb[2] ?? 0; ac += rb[3] ?? 0; crit += (rb[4] ?? 0) / 100; dodge += (rb[5] ?? 0) / 100; dmgB += (rb[6] ?? 0) / 100; }
+  { const pv = PVR[pvpRank(p.pk ?? 0)]; if (pv) { watk += pv.a; hp += pv.h; crit += pv.c / 100; ac += pv.ac; } }
   const pas = (i: number): boolean => p.sk.indexOf(i) >= 0;
   if (pas(35)) ac += 3 + Math.floor(L('pk') / 2);
   if (pas(37)) { dmgB += 0.08 + 0.01 * L('pe'); crit += 0.05 + 0.005 * L('pe'); }
@@ -826,6 +832,47 @@ function gainExp(g: G, v: number): void {
     emit(g, p.x, p.y - 15, 40, "#ffe060", 160, 1, 3.5);
     addLog(g, `恭喜！你升到了 ${p.lv} 級，獲得 1 點能力點數（按 C 分配）。`, "#ffe060");
   }
+  lvrCheck(g);
+}
+interface LvR { g?: number; pr?: number; pg?: number; pb?: number; sw?: number; sa?: number; bw?: number; ba?: number; ab?: number; rs?: number; cp?: number; x?: number[]; dia?: number; q?: number }
+const LVR: Record<number, LvR> = {
+  5: { pr: 20, pb: 10, g: 2000, x: [1] }, 10: { pr: 30, pg: 5, pb: 15, g: 5000, x: [1, 1] }, 15: { pr: 40, pg: 8, pb: 20, g: 10000, x: [2] }, 20: { pr: 50, pg: 10, pb: 25, g: 20000, x: [2, 2] },
+  25: { sw: 3, sa: 3, cp: 5, x: [4, 4], dia: 30 }, 30: { sw: 4, sa: 4, cp: 8, x: [4, 4], dia: 50 }, 35: { sw: 5, sa: 5, cp: 10, x: [5], dia: 60 }, 40: { sw: 6, sa: 6, cp: 12, x: [5, 5], dia: 80 },
+  45: { bw: 1, ba: 1, rs: 2, ab: 1, x: [7, 7] }, 50: { bw: 2, ba: 2, rs: 3, ab: 2, x: [7, 7] }, 55: { bw: 2, ba: 2, rs: 4, ab: 2, x: [8] }, 60: { bw: 3, ba: 3, rs: 5, ab: 3, x: [8, 8] },
+  65: { dia: 300, bw: 3, ba: 3, ab: 3, x: [8, 8] }, 70: { q: 4, dia: 500 }, 75: { dia: 400, bw: 4, ba: 4, ab: 4, rs: 5 }, 80: { q: 5, dia: 1000 },
+};
+function lvrText(lv: number, cls: number): string {
+  const r = LVR[lv]; if (!r) return '';
+  const xc: Record<number, number> = {}; for (const i of r.x ?? []) xc[i] = (xc[i] ?? 0) + 1;
+  return [r.q ? `${CLN[cls] ?? ''}專用【${QN[r.q] ?? ''}】武器 ×1` : '', r.dia ? `鑽石 ×${r.dia}` : '', r.g ? `金幣 ×${r.g.toLocaleString()}` : '', r.pr ? `紅色藥水 ×${r.pr}` : '', r.pg ? `綠色加速藥水 ×${r.pg}` : '', r.pb ? `藍色藥水 ×${r.pb}` : '',
+    r.sw ? `武器強化卷軸 ×${r.sw}` : '', r.sa ? `防具強化卷軸 ×${r.sa}` : '', r.bw ? `祝福武器強化卷軸 ×${r.bw}` : '', r.ba ? `祝福防具強化卷軸 ×${r.ba}` : '', r.cp ? `${CPN[cls] ?? ''} ×${r.cp}` : '', r.rs ? `洗鍊石 ×${r.rs}` : '', r.ab ? `防爆卷軸 ×${r.ab}` : '',
+    ...Object.keys(xc).map((k: string) => `${xsName(Number(k))} ×${xc[Number(k)] ?? 0}`)].filter((s: string) => s !== '').join('、');
+}
+function lvrGear(g: G, q: number): string {
+  const p = g.p, ids = IT.map((_d: IDef, i: number) => i).filter((i: number) => { const d = IT[i] as IDef; return d.s === 0 && d.r === 0 && d.m === 1 << p.cls; });
+  if (ids.length === 0) IT.forEach((d: IDef, i: number) => { if (d.s === 0 && d.r === 0 && clsOk(d, p.cls)) ids.push(i); });
+  const mt = ids.reduce((a: number, i: number) => Math.max(a, IT[i]?.t ?? 0), 0), top = ids.filter((i: number) => (IT[i]?.t ?? 0) >= mt);
+  const it = mkItem(top[Math.floor(Math.random() * top.length)] ?? byName('短劍'));
+  rollQ(it, true, q); it.q = q;
+  if (!addItem(g, it)) { p.inv.push(it); }
+  return `【${QN[it.q ?? 0] ?? ''}】${itemName(it)}`;
+}
+function lvrGrant(g: G, lv: number): string {
+  const r = LVR[lv], p = g.p; if (!r) return '';
+  p.gold += r.g ?? 0; p.pots += r.pr ?? 0; p.green += r.pg ?? 0; p.blue += r.pb ?? 0; p.ew += r.sw ?? 0; p.ea += r.sa ?? 0; p.bw += r.bw ?? 0; p.ba += r.ba ?? 0;
+  p.ab = (p.ab ?? 0) + (r.ab ?? 0); p.rs = (p.rs ?? 0) + (r.rs ?? 0); p.cpn = (p.cpn ?? 0) + (r.cp ?? 0); p.dia = (p.dia ?? 0) + (r.dia ?? 0);
+  const xa = xsArr(p); for (const i of r.x ?? []) xa[i] = (xa[i] ?? 0) + 1;
+  let gn = ''; if (r.q) gn = lvrGear(g, r.q);
+  const t = lvrText(lv, p.cls);
+  addLog(g, `【等級獎勵 Lv.${lv}】${gn ? `${gn}、` : ''}${t.replace(/^[^、]*專用【[^】]*】武器 ×1、?/, '')}`, '#ffe08a');
+  return gn;
+}
+function lvrCheck(g: G): void {
+  const p = g.p, top = Math.min(80, Math.floor(p.lv / 5) * 5);
+  if ((p.lr ?? 0) >= top) return;
+  const got: number[] = [];
+  while ((p.lr ?? 0) + 5 <= top) { p.lr = (p.lr ?? 0) + 5; lvrGrant(g, p.lr); got.push(p.lr); }
+  if (got.length > 0) { g.banner = { t: got.length > 1 ? `補發等級獎勵 Lv.${got[0]}～${got[got.length - 1]}！` : `獲得等級獎勵 Lv.${got[0]}！`, c: '#ffe08a', l: 3 }; addText(g, p.x, p.y - 70, '等級獎勵！', '#ffe08a', 18); sfx('rare'); }
 }
 function killMon(g: G, m: Mon): void {
   const d = md(m), p = g.p;
@@ -1408,7 +1455,8 @@ function pvpStep(g: G, dt: number): void {
     }
   }
 }
-function pvpHurt(g: G, b: Bot, dmg: number, crit: boolean): void {
+function pvpHurt(g: G, b: Bot, dmg0: number, crit: boolean): void {
+  const dmg = Math.round(dmg0 * (1 + (PVR[pvpRank(g.p.pk ?? 0)]?.d ?? 0) / 100));
   const mx = bMhp(b); b.php = (b.php ?? mx) - dmg; b.swing = 0;
   if (!b.ag) { b.ag = 1; b.acd = 0.4; b.agT = 60; b.vs = -1; botSay(g, b, ['你幹嘛打我！', '想打架？來啊！', '偷襲？太卑鄙了！'][Math.floor(Math.random() * 3)] ?? '', true); }
   addText(g, b.x + rnd(-6, 6), b.y - 58, crit ? `暴擊 ${dmg}` : String(dmg), crit ? '#ffb040' : '#ffffff', crit ? 15 : 13);
@@ -1416,9 +1464,10 @@ function pvpHurt(g: G, b: Bot, dmg: number, crit: boolean): void {
   if (b.php <= 0) {
     emit(g, b.x, b.y - 20, 26, '#ff4040', 150, 0.8, 3.5); ring(g, b.x, b.y - 15, '#ff4040', 150, 0.6);
     b.dd = 20; b.ag = 0; b.php = 0; b.tg = null; PVP = -1;
-    g.p.pk = (g.p.pk ?? 0) + 1;
+    const pr0 = pvpRank(g.p.pk ?? 0); g.p.pk = (g.p.pk ?? 0) + 1; const pr1 = pvpRank(g.p.pk);
     addLog(g, `【PvP】你擊殺了玩家 ${b.n}（${CLN[b.cls] ?? ''} Lv.${b.lv}）！PvP 擊殺 ${g.p.pk}`, '#ff8080');
     g.banner = { t: `擊殺玩家 ${b.n}！`, c: '#ff8080', l: 2.2 };
+    if (pr1 > pr0) { const pv = PVR[pr1]; g.banner = { t: `擊殺聲望提升：${pv?.n ?? ''}！`, c: '#ff6a6a', l: 3 }; addLog(g, `【擊殺聲望】你獲得了稱號「${pv?.n ?? ''}」！加成：${pvText(pr1)}（只套用最高稱號）`, '#ff8a8a'); ring(g, g.p.x, g.p.y - 20, '#ff5050', 180, 0.8); sfx('rare'); }
   }
 }
 function botPvp(g: G, b: Bot, dt: number, near: boolean): boolean {
@@ -1661,7 +1710,15 @@ function drawBot(ctx: CanvasRenderingContext2D, g: G, i: number, font: string): 
 }
 
 /* ---------- auto hunt & auto potion ---------- */
+function fieldZone(g: G): number {
+  if (g.set.zone >= 0 && g.set.zone < 8) return g.set.zone;
+  const z = WID === 0 ? zoneAt(g.p.x, g.p.y) : -1;
+  if (z >= 0 && z < 8) return z;
+  const lv = g.p.lv;
+  return ZLV.slice(0, 8).reduce((b: number, l: number, i: number) => (lv >= l + 2 && l >= (ZLV[b] ?? 0) ? i : b), 0);
+}
 function bestZone(g: G): number {
+  if (WID === 0) return fieldZone(g);
   if (g.set.zone >= 0) return g.set.zone;
   const z = zoneAt(g.p.x, g.p.y);
   if (z >= 0) return z;
@@ -1757,6 +1814,8 @@ function autoHunt(g: G, dt: number): void {
   const p = g.p, s = stats(p), c = cl(p.cls);
   if (!g.auto || p.dead > 0) return;
   if (g.autoPause > 0) { g.autoPause -= dt; return; }
+  if (WID === 0 && g.huntZ >= 8) { const nz = fieldZone(g); g.huntZ = nz; addLog(g, `已回到地面，自動掛機改在 ${ZN[nz + 1] ?? ''} 狩獵（不會自動進入地城）。`, '#a0d0ff'); }
+  else if (WID !== 0 && g.huntZ < 8) { const dz = zoneAt(p.x, p.y); if (dz >= 8) g.huntZ = dz; }
   const town = zoneAt(p.x, p.y) === -1, hpPct = p.hp / s.mhp;
   let near = 0;
   for (const m of g.mons) if (m.dead <= 0 && m.st === 1 && Math.hypot(m.x - p.x, m.y - p.y) < md(m).r + 80) near++;
@@ -1773,11 +1832,9 @@ function autoHunt(g: G, dt: number): void {
   if (zoneAt(p.x, p.y) === -1) {
     if (g.set.restock && !g.stocked) { restock(g); g.stocked = true; }
     if (hpPct < 0.8) { p.tgt = null; p.path = []; p.dest = null; return; }
-    if (g.huntZ >= 8) { const a = DARR[g.huntZ - 8], c2 = 200 + (ZLV[g.huntZ] ?? 1) * 20; if (a && p.gold >= c2 + 200) { p.gold -= c2; tpTo(g, a.x, a.y); addLog(g, `自動傳送到${DUNS[g.huntZ - 8]?.n ?? ''}入口（${c2} 金幣）`, '#a0d0ff'); return; } }
     const zp = ZPT[g.huntZ];
     if (zp && Math.hypot(zp.x - p.x, zp.y - p.y) > 50 * TS && p.gold >= teleCost(g.huntZ) + 200) { p.gold -= teleCost(g.huntZ); tpTo(g, zp.x, zp.y); addLog(g, `自動傳送到 ${ZN[g.huntZ + 1] ?? ''}（${teleCost(g.huntZ)} 金幣）`, '#a0d0ff'); return; }
   } else g.stocked = false;
-  if (WID === 0 && g.huntZ >= 8) { const e = DENT[g.huntZ - 8]; if (e && !p.dest && p.path.length === 0) goTo(g, e.x, e.y); unstick(g, dt); return; }
   if (p.cls === 2 && hpPct < 0.55 && p.mp >= c.skMp && p.skCd <= 0) { castSkill(g); return; }
   const lh = p.lastHit;
   if (lh && lh.dead <= 0 && lh !== p.tgt && g.time - p.hitT < 1.2) {
@@ -1788,7 +1845,7 @@ function autoHunt(g: G, dt: number): void {
     let best: Drop | null = null, bd = 230;
     for (const dr of g.drops) {
       const d = Math.hypot(dr.x - p.x, dr.y - p.y);
-      if (d < bd && dr.bn <= g.time && !(dr.it && p.inv.length >= invCap(p))) { bd = d; best = dr; }
+      if (d < bd && dr.bn <= g.time && !(dr.it && invUsed(p) >= invCap(p))) { bd = d; best = dr; }
     }
     if (best) {
       if (best !== p.loot) { p.loot = best; p.lootT = 0; p.tgt = null; goTo(g, best.x, best.y); }
@@ -1848,6 +1905,7 @@ function update(g: G, inp: Inp, dt: number): void {
       moveBy(p, (ix / m) * sp, (iy / m) * sp, PR, false);
       p.face = Math.atan2(iy, ix); p.walk += dt; p.moving = true;
     } else {
+      if ((p.lr ?? 0) + 5 <= Math.min(80, p.lv)) lvrCheck(g);
       if (PVP < 0) autoHunt(g, dt); else p.tgt = null;
       if (inp.down && !p.tgt && PVP < 0) { inp.rt -= dt; if (inp.rt <= 0) { inp.rt = 0.25; goTo(g, g.camX + inp.sx / g.zoom, g.camY + inp.sy / g.zoom); } }
       const m = p.tgt;
@@ -1876,7 +1934,7 @@ function update(g: G, inp: Inp, dt: number): void {
       if (!g.banner || g.banner.l < 0.5) g.banner = { t: town ? `${townName(p.x, p.y)} · 安全區域` : WID !== 0 ? `${dunName()}（建議 Lv.${ZLV[zz] ?? 1}+）` : `進入 ${ZN[zz + 1] ?? ''}（建議 Lv.${ZLV[zz] ?? 1}+）`, c: ZC[zz + 1] ?? '#ffffff', l: 2 };
     }
     const stt = MAP[Math.floor(p.y / TS) * MW + Math.floor(p.x / TS)] ?? 0;
-    if (stt === 24 || stt === 25) { if (g.stairT <= 0 && !(g.auto && WID !== 0 && !(g.retreat && stt === 25))) { g.stairT = 1; useStairs(g, stt === 24); } } else g.stairT = 0;
+    if (stt === 24 || stt === 25) { if (g.stairT <= 0 && !(g.auto && WID !== 0 && !(g.retreat && stt === 25)) && !(g.auto && WID === 0 && g.autoPause <= 0)) { g.stairT = 1; useStairs(g, stt === 24); } } else g.stairT = 0;
     if (p.combatT > 5 || town) p.hp = Math.min(s.mhp, p.hp + s.mhp * (town ? 0.08 : 0.015) * s.hpR * dt);
     p.mp = Math.min(s.mmp, p.mp + (c.mpReg + p.lv * 0.06) * s.mpR * (town ? 3 : 1) * dt);
   }
@@ -2057,7 +2115,7 @@ function dropLoot(g: G, m: Mon): void {
   const mkG = (q: number, uq: boolean): void => { const it = mkItem(rollItem(d.lv, slots, boss, g.p.cls, !!m.wb, uq)); if (!uq && Math.random() < 0.08) it.en = 1 + Math.floor(Math.random() * 2); rollQ(it, boss, q); gear.push(it); };
   if (d.b === 1) { if (Math.random() < (big ? 0.4 : 0.3)) { mkG(bossQ(), true); if (Math.random() < 0.4) mkG(bossQ(), false); } else { const n = (big ? 3 : 2) + (Math.random() < 0.4 ? 1 : 0); for (let i = 0; i < n; i++) mkG(bossQ(), false); } }
   else if (m.el) mkG(bossQ(), false);
-  else if (Math.random() < (0.09 + d.lv * 0.002) / 12) mkG(normQ(d.lv), false);
+  else if (Math.random() < Math.min(0.095, 0.06 + d.lv * 0.0012)) mkG(normQ(d.lv), false);
   for (const it of gear) {
     if ((it.q ?? 0) >= 3) { sfx('rare'); addLog(g, `【${QN[it.q ?? 0] ?? ''}】品質裝備：${itemName(it)}！`, QC[it.q ?? 0] ?? '#ffffff'); g.banner = { t: `${QN[it.q ?? 0] ?? ''}裝備：${itemName(it)}`, c: QC[it.q ?? 0] ?? '#ffffff', l: 2.4 }; ring(g, m.x, m.y, QC[it.q ?? 0] ?? '#ffffff', 160, 0.7); }
     put(4, it);
@@ -2071,7 +2129,7 @@ function dropLoot(g: G, m: Mon): void {
 }
 function dropName(dr: Drop): string { return dr.it ? itemName(dr.it) : dr.k === 9 ? `技能書：${SK[dr.s ?? 0]?.n ?? ''}` : DN[dr.k] ?? ""; }
 function addItem(g: G, it: Item): boolean {
-  if (g.p.inv.length >= invCap(g.p)) { if (g.time - fullWarn > 4) { fullWarn = g.time; addLog(g, `背包已滿（${invCap(g.p)} 格）！`, '#ff9090'); } return false; }
+  if (invUsed(g.p) >= invCap(g.p)) { if (g.time - fullWarn > 4) { fullWarn = g.time; addLog(g, `背包已滿（${invCap(g.p)} 格）！`, '#ff9090'); } return false; }
   g.p.inv.push(it); return true;
 }
 function pickUp(g: G, dr: Drop): boolean {
@@ -2113,7 +2171,7 @@ function equip(g: G, it: Item, slot?: number): void {
 function unequip(g: G, s: number): void {
   const p = g.p, it = p.eq[s];
   if (!it) return;
-  if (p.inv.length >= invCap(p)) { addLog(g, '背包已滿，無法卸下。', '#ff9090'); return; }
+  if (invUsed(p) >= invCap(p)) { addLog(g, '背包已滿，無法卸下。', '#ff9090'); return; }
   p.eq[s] = null; p.inv.push(it); clampHM(p);
 }
 function sell(g: G, it: Item): void {
@@ -2196,6 +2254,7 @@ function huntTarget(g: G, q: QDef): void {
   const sp = freeNear(pt.x, pt.y); tpTo(g, sp.x, sp.y);
   if (best) { p.face = Math.atan2(best.y - sp.y, best.x - sp.x); }
   addLog(g, `傳送到${want === 0 ? ZN[d.z + 1] ?? '' : dunName()}，${best ? `${d.n} 就在旁邊` : `這附近就有 ${d.n}`}！`, '#80ffa0');
+  if (g.auto) { const hz = zoneAt(p.x, p.y); g.huntZ = hz >= 0 ? hz : d.z; }
 }
 function guideQuest(g: G, q: QDef): void {
   g.qg = -1;
@@ -2378,6 +2437,7 @@ function tpTo(g: G, x: number, y: number): void {
 function teleport(g: G, t: Tele): void {
   if (g.p.gold < t.p) { addLog(g, '金幣不足。', '#ff9090'); return; }
   g.p.gold -= t.p; tpTo(g, t.x, t.y); addLog(g, `傳送到 ${t.n}。`, '#a0d0ff');
+  if (g.auto && WID === 0) { const z = zoneAt(t.x, t.y); if (z >= 0 && z < 8) g.huntZ = z; }
 }
 function townIdx(x: number, y: number): number { const tx = x / TS, ty = y / TS; return TOWNS.findIndex((t: Town) => tx >= t.x && tx < t.x + TW && ty >= t.y && ty < t.y + TH); }
 function townName(x: number, y: number): string { return TOWNS[townIdx(x, y)]?.n ?? '城鎮'; }
@@ -2554,7 +2614,7 @@ function legacyItem(a: unknown): Item | null {
   const k = num(a[0], 0), tr = clamp(Math.floor(num(a[1], 0)), 0, 4), c = clamp(Math.floor(num(a[3], 0)), 0, 2);
   return mkItem(byName(k === 0 ? LEGW[c]?.[tr] ?? '短劍' : LEGA[tr] ?? '皮甲'), clamp(Math.floor(num(a[2], 0)), 0, 30));
 }
-function extSave(g: G): Record<string, unknown> { const p = g.p; return { v: 3, w: 2, kc: p.kc ?? 0, pets: p.pets ?? [], pa: p.pa ?? -1, dl: p.dolls ?? [], dw: p.doll ?? -1, pf: [p.poly ?? -1, Math.round(p.polyT ?? 0)], mt: p.mt ?? [], dia: p.dia ?? 0, dq: p.dq ?? [], dqd: p.dqd ?? '', mq: p.mq ?? [0, 0, 0], bt: p.bt ?? null, bc: p.bc ?? 0, rs: p.rs ?? 0, s: WSEED, h: p.home, q: p.q, bk: p.bank.map(packItem), bl: Math.round(p.blessT), sk: p.sk, hb: p.hb, t: Date.now(), ab: p.ab ?? 0, xs: p.xs ?? [], xb: p.xb ?? [0, 0], cpn: p.cpn ?? 0, skx: Object.keys(p.skx ?? {}).map((k: string) => [Number(k), Math.round((p.skx?.[Number(k)] ?? 0) * 10) / 10]), bx: p.bagX ?? 0, wx: p.wareX ?? 0, r13: 1, au: [VOL, MUTE ? 1 : 0, BGM_ON ? 1 : 0], ai: g.bots.map((b: Bot) => [b.cls, b.lv, Math.round(b.exp), Math.floor(b.kc ?? 0), b.en ?? 0]), pk: p.pk ?? 0 }; }
+function extSave(g: G): Record<string, unknown> { const p = g.p; return { v: 3, w: 2, lr: p.lr ?? 0, kc: p.kc ?? 0, pets: p.pets ?? [], pa: p.pa ?? -1, dl: p.dolls ?? [], dw: p.doll ?? -1, pf: [p.poly ?? -1, Math.round(p.polyT ?? 0)], mt: p.mt ?? [], dia: p.dia ?? 0, dq: p.dq ?? [], dqd: p.dqd ?? '', mq: p.mq ?? [0, 0, 0], bt: p.bt ?? null, bc: p.bc ?? 0, rs: p.rs ?? 0, s: WSEED, h: p.home, q: p.q, bk: p.bank.map(packItem), bl: Math.round(p.blessT), sk: p.sk, hb: p.hb, t: Date.now(), ab: p.ab ?? 0, xs: p.xs ?? [], xb: p.xb ?? [0, 0], cpn: p.cpn ?? 0, skx: Object.keys(p.skx ?? {}).map((k: string) => [Number(k), Math.round((p.skx?.[Number(k)] ?? 0) * 10) / 10]), bx: p.bagX ?? 0, wx: p.wareX ?? 0, r13: 1, au: [VOL, MUTE ? 1 : 0, BGM_ON ? 1 : 0], ai: g.bots.map((b: Bot) => [b.cls, b.lv, Math.round(b.exp), Math.floor(b.kc ?? 0), b.en ?? 0]), pk: p.pk ?? 0 }; }
 function extLoad(g: G, e: Record<string, unknown>): void {
   const p = g.p;
   p.dia = Math.max(0, Math.floor(num(e.dia, 0)));
@@ -2563,7 +2623,7 @@ function extLoad(g: G, e: Record<string, unknown>): void {
   if (Array.isArray(e.xs)) { const xa = e.xs as unknown[]; p.xs = [0, 1, 2, 3, 4, 5, 6, 7, 8].map((i: number) => Math.max(0, Math.floor(num(xa[i], 0)))); }
   if (Array.isArray(e.xb)) { const xa = e.xb as unknown[]; p.xb = [clamp(Math.floor(num(xa[0], 0)), 0, 25), clamp(num(xa[1], 0), 0, 7200)]; }
   if (Array.isArray(e.skx)) { const sx: Record<number, number> = {}; for (const r of e.skx as unknown[]) { if (!Array.isArray(r)) continue; const ra = r as unknown[], id = Math.floor(num(ra[0], -1)), v = Math.max(0, num(ra[1], 0)); if (SK[id]) sx[id] = v; } p.skx = sx; }
-  p.kc = Math.max(0, Math.floor(num(e.kc, 0))); p.pk = Math.max(0, Math.floor(num(e.pk, 0)));
+  p.kc = Math.max(0, Math.floor(num(e.kc, 0))); p.pk = Math.max(0, Math.floor(num(e.pk, 0))); p.lr = clamp(Math.floor(num(e.lr, 0) / 5) * 5, 0, 80);
   if (Array.isArray(e.mq)) { const a = e.mq as unknown[]; p.mq = [clamp(Math.floor(num(a[0], 0)), 0, MQS.length), Math.max(0, Math.floor(num(a[1], 0))), num(a[2], 0) === 1 ? 1 : 0]; }
   { const bt = e.bt as { d?: unknown; n?: unknown; b?: unknown } | null | undefined; if (bt && typeof bt === 'object' && typeof bt.d === 'string' && Array.isArray(bt.b)) p.bt = { d: bt.d, n: clamp(Math.floor(num(bt.n, 1)), 1, BT_MAX), b: (bt.b as unknown[]).filter((r: unknown) => Array.isArray(r)).slice(0, 3).map((r: unknown) => [0, 1, 2, 3, 4, 5].map((k: number) => Math.max(0, Math.floor(num((r as unknown[])[k], 0))))) }; }
   p.bc = Math.max(0, Math.floor(num(e.bc, 0))); p.rs = Math.max(0, Math.floor(num(e.rs, 0)));
@@ -3029,6 +3089,7 @@ function paintIcon(x: CanvasRenderingContext2D, key: string): void {
   if (key === 'pk1') { paintCookie(x); return; }
   if (key === 'xb' || key === 'xw') { paintExp(x, key === 'xw'); return; }
   if (key === 'rk') { paintStone(x); return; }
+  if (key.slice(0, 2) === 'mt') { paintMat(x, Number(key.slice(2))); return; }
   const k0 = key[0] ?? "", a1 = Number(key[1] ?? 0), a2 = Number(key[2] ?? 0);
   if (k0 === 'G') { paintGear(x, Number(key.slice(1))); return; }
   if (k0 === 'g') { gearSlot(x, Number(key.slice(1))); return; }
@@ -3098,6 +3159,41 @@ function paintExp(x: CanvasRenderingContext2D, ware: boolean): void {
     box(x, 13, 24, 22, 6, 2, lg(x, 0, 24, 0, 30, '#b88048', '#5a3418'), OL); box(x, 21, 25, 6, 4, 1, '#f0cc60', OL);
   }
   ball(x, 36, 12, 7, '#a0ffb0', '#1a8a3a', OL); seg(x, 32.5, 12, 39.5, 12, '#ffffff', 2); seg(x, 36, 8.5, 36, 15.5, '#ffffff', 2);
+}
+function paintMat(x: CanvasRenderingContext2D, i: number): void {
+  x.fillStyle = 'rgba(0,0,0,0.3)'; x.beginPath(); x.ellipse(24, 42, 14, 3, 0, 0, TAU); x.fill();
+  if (i === 0) {
+    shape(x, [9, 12, 16, 8, 24, 11, 32, 7, 40, 12, 37, 22, 41, 32, 33, 39, 24, 36, 15, 40, 7, 31, 11, 22], lg(x, 8, 8, 40, 40, '#e8b878', '#6a3a14'), OL, 1.4);
+    shape(x, [14, 15, 24, 14, 34, 15, 32, 24, 34, 33, 24, 32, 15, 33, 17, 24], 'rgba(255,230,180,0.22)');
+    x.setLineDash([2, 2.2]); x.strokeStyle = 'rgba(60,30,8,0.8)'; x.lineWidth = 1; x.beginPath(); x.moveTo(13, 15); x.lineTo(35, 15); x.lineTo(33, 34); x.lineTo(15, 34); x.closePath(); x.stroke(); x.setLineDash([]);
+    for (let k = 0; k < 6; k++) seg(x, 16 + k * 3, 19 + (k % 2) * 6, 18 + k * 3, 23 + (k % 2) * 6, 'rgba(90,50,20,0.55)', 1);
+  } else if (i === 1) {
+    shape(x, [8, 30, 12, 17, 22, 10, 34, 12, 41, 23, 38, 36, 26, 41, 13, 38], lg(x, 8, 10, 40, 41, '#9aa2ac', '#2e3238'), OL, 1.4);
+    shape(x, [12, 17, 22, 10, 26, 22, 14, 26], 'rgba(255,255,255,0.18)'); shape(x, [26, 22, 38, 36, 26, 41], 'rgba(0,0,0,0.22)');
+    shape(x, [18, 22, 24, 19, 27, 25, 21, 28], lg(x, 18, 19, 27, 28, '#ffffff', '#c06a2a'), 'rgba(80,30,0,0.8)', 0.8);
+    shape(x, [28, 28, 33, 26, 34, 32, 29, 33], lg(x, 28, 26, 34, 33, '#ffe0c0', '#b05a20'), 'rgba(80,30,0,0.8)', 0.8);
+    gStar(x, 22, 21, 2, '#ffffff'); seg(x, 14, 31, 22, 34, 'rgba(255,255,255,0.25)', 1);
+  } else if (i === 2) {
+    glow(x, 24, 24, 22, '#60c8ff', 0.5);
+    shape(x, [24, 4, 31, 14, 29, 38, 19, 38, 17, 14], lg(x, 17, 4, 31, 38, '#e8fbff', '#1a5ab8'), OL, 1.3);
+    shape(x, [11, 16, 17, 22, 16, 39, 9, 38, 7, 24], lg(x, 7, 16, 17, 39, '#c8f0ff', '#14408a'), OL, 1.2);
+    shape(x, [37, 14, 42, 24, 40, 39, 32, 39, 31, 22], lg(x, 31, 14, 42, 39, '#d8f4ff', '#163e90'), OL, 1.2);
+    shape(x, [24, 4, 26, 14, 24, 38, 21, 14], 'rgba(255,255,255,0.35)');
+    gStar(x, 27, 11, 2.6, '#ffffff'); gStar(x, 12, 22, 1.6, '#ffffff'); gRays(x, 24, 22, 14, 21, 8, 'rgba(160,230,255,0.45)', 1);
+  } else if (i === 3) {
+    glow(x, 24, 24, 20, '#a0ffb0', 0.35);
+    x.save(); x.translate(24, 24); x.rotate(-0.7);
+    x.fillStyle = lg(x, -6, -20, 6, 20, '#f4fff0', '#4ab860'); x.strokeStyle = OL; x.lineWidth = 1.3;
+    x.beginPath(); x.moveTo(0, -20); x.bezierCurveTo(10, -12, 9, 8, 0, 18); x.bezierCurveTo(-9, 8, -10, -12, 0, -20); x.fill(); x.stroke();
+    for (let k = -14; k < 14; k += 3.5) { seg(x, 0, k, 7, k - 4, 'rgba(30,90,40,0.5)', 0.8); seg(x, 0, k, -7, k - 4, 'rgba(30,90,40,0.5)', 0.8); }
+    seg(x, 0, -18, 0, 22, '#f8fff0', 1.4); x.restore(); gStar(x, 33, 12, 2.2, '#ffffff');
+  } else {
+    glow(x, 24, 24, 22, '#ff6040', 0.35);
+    shape(x, [24, 5, 38, 12, 37, 28, 24, 42, 11, 28, 10, 12], lg(x, 10, 5, 38, 42, '#ffb070', '#6a0a08'), OL, 1.4);
+    shape(x, [24, 9, 33, 14, 32, 27, 24, 36, 16, 27, 15, 14], lg(x, 15, 9, 33, 36, '#ff8a50', '#9a1a10'), 'rgba(60,0,0,0.6)', 0.9);
+    seg(x, 24, 9, 24, 36, 'rgba(255,220,160,0.55)', 1.2); shape(x, [15, 14, 24, 9, 24, 22, 16, 22], 'rgba(255,255,255,0.22)');
+    gStar(x, 30, 14, 2.4, '#fff0c0');
+  }
 }
 function paintStone(x: CanvasRenderingContext2D): void {
   x.fillStyle = 'rgba(0,0,0,0.3)'; x.beginPath(); x.ellipse(24, 42, 13, 3, 0, 0, TAU); x.fill();
@@ -5837,7 +5933,7 @@ function render(ctx: CanvasRenderingContext2D, g: G, cw: number, ch: number, dpr
       const pf = POLY[p.poly ?? -1];
       if ((p.polyT ?? 0) > 0 && pf && p.dead <= 0) { const pr = MD[pf.m]?.r ?? 14; shadow(ctx, p.x, p.y + 1, pr * 1.2); if (p.hurt > 0) ctx.globalAlpha = 0.7; drawSpr(ctx, pf.m, p.x + (p.swing > 0 ? Math.cos(p.face) * 6 : 0), p.y, 1, Math.cos(p.face) < 0 ? -1 : 1, p.swing > 0 ? 6 : p.moving ? Math.floor(p.walk * 8) % 6 : 0); ctx.globalAlpha = 1; }
       else drawHero(ctx, look, p.x, p.y, p.face, p.walk, p.moving, p.swing, p.hurt, g.time, p.hasteT > 0 && p.dead <= 0, p.dead > 0 ? 1 : 0);
-      const dl = DOLL[p.doll ?? -1]; if (dl && p.dead <= 0) { const bob = Math.sin(g.time * 2.4) * 4, dx0 = p.x - 28, dy0 = p.y - 34 + bob; ball(ctx, dx0, dy0 - 8, 16, 'rgba(200,180,255,0.25)', 'rgba(0,0,0,0)'); drawSpr(ctx, dl.m, dx0, dy0, 0.42, 1, Math.floor(g.time * 4) % 6); } const rk = rankOf(p.kc ?? 0); if (rk > 0 && p.dead <= 0) label(ctx, `【${RKN[rk] ?? ''}】`, p.x, p.y - 76, '#ffd860', 11, font, 'center'); }
+      const dl = DOLL[p.doll ?? -1]; if (dl && p.dead <= 0) { const bob = Math.sin(g.time * 2.4) * 4, dx0 = p.x - 28, dy0 = p.y - 34 + bob; ball(ctx, dx0, dy0 - 8, 16, 'rgba(200,180,255,0.25)', 'rgba(0,0,0,0)'); drawSpr(ctx, dl.m, dx0, dy0, 0.42, 1, Math.floor(g.time * 4) % 6); } const rk = rankOf(p.kc ?? 0); if (rk > 0 && p.dead <= 0) label(ctx, `【${RKN[rk] ?? ''}】`, p.x, p.y - 76, '#ffd860', 11, font, 'center'); const pvr = PVR[pvpRank(p.pk ?? 0)]; if (pvr && p.dead <= 0) label(ctx, `⚔${pvr.n}`, p.x, p.y - (rk > 0 ? 91 : 76), pvpRank(p.pk ?? 0) >= 3 ? '#ff3030' : '#ff7a6a', 11, font, 'center'); }
     else if (v.t === -3) { const b = BLDS[v.x], fd = b ? hid(b.x * TS - 10, (b.x + b.w) * TS + 10, b.y * TS - 64 - (b.k === 4 ? 60 : 0) + 24, (b.y + b.h) * TS - 2) : false; if (fd) ctx.globalAlpha = 0.45; drawBld(ctx, v.x, font, g.time); ctx.globalAlpha = 1; }
     else if (v.t === -4) drawProp(ctx, v.x, g.time);
     else if (v.t === -10) { const e = DENT[v.x]; if (e) drawCave(ctx, v.x, e, g.time, font); }
@@ -6437,32 +6533,34 @@ export default function App() {
   };
   const bagView = () => {
     if (!g) return null;
-    const cap = invCap(g.p), sel = g.p.inv.find((x: Item) => x.id === bagSel) ?? null, xs = xsArr(g.p);
+    const cap = invCap(g.p), sel = g.p.inv.find((x: Item) => x.id === bagSel) ?? null, xs = xsArr(g.p), mt = mats(g.p);
+    const stk: { k: string; ic: string; n: number; t: string; f?: () => void; s?: string }[] = [
+      ...([['pr', g.p.pots, () => drinkPot(g, false)], ['pg', g.p.green, () => drinkGreen(g, false)], ['pb', g.p.blue, () => drinkBlue(g, false)], ['sr', g.p.scrolls, () => recall(g)], ['sw', g.p.ew], ['sa', g.p.ea], ['sx', g.p.bw], ['sy', g.p.ba]] as [string, number, (() => void) | undefined][]).map(([k, n, f]: [string, number, (() => void) | undefined]) => ({ k, ic: k, n, t: `${ITIP[k] ?? ''}\n持有數量：${n}${f ? '\n點一下使用' : ''}`, f })),
+      { k: 'ab', ic: 'sp', n: g.p.ab ?? 0, t: `防爆卷軸\n強化失敗會爆裝時自動消耗 1 張，裝備保留、強化值不變。\n持有數量：${g.p.ab ?? 0}` },
+      { k: 'rs', ic: 'rk', n: g.p.rs ?? 0, t: `洗鍊石\n紫色／金色武器與項鍊重新隨機詞綴（鍛造屋）\n持有數量：${g.p.rs ?? 0}` },
+      { k: 'cp', ic: `pk${g.p.cls}`, n: g.p.cpn ?? 0, t: `${CPN[g.p.cls] ?? ''}\n${CPD[g.p.cls] ?? ''}\n持有數量：${g.p.cpn ?? 0}\n點一下使用`, f: () => drinkCp(g, false) },
+      ...xs.map((n: number, i: number) => ({ k: `x${i}`, ic: `se${Math.floor(i / 3) + 1}`, n, t: `${xsName(i)}\n持有數量：${n}\n點一下使用`, f: () => { setMsg({ t: useXs(g, i), ok: true }); }, s: `${XSM[i % 3] ?? 5}分` })),
+      ...mt.map((n: number, i: number) => ({ k: `m${i}`, ic: `mt${i}`, n, t: `材料：${MTN[i] ?? ''}\n用於鍛造屋製作裝備\n持有數量：${n}` })),
+    ].filter((o: { n: number }) => o.n > 0);
+    const used = g.p.inv.length + stk.length;
     const tabB = (k: number, t: string) => <button style={{ ...sb, background: bagTab === k ? '#5a4420' : 'rgba(255,255,255,0.08)', borderColor: bagTab === k ? '#e8c060' : 'rgba(255,255,255,0.28)', color: bagTab === k ? '#ffe08a' : '#eef2f8' }} onClick={() => setBagTab(k)}>{t}</button>;
     return (
       <div>
-        <div style={sec}>道具</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, padding: '6px 0', alignItems: 'center' }}>
-          {([['pr', g.p.pots], ['pg', g.p.green], ['pb', g.p.blue], ['sr', g.p.scrolls], ['sw', g.p.ew], ['sa', g.p.ea], ['sx', g.p.bw], ['sy', g.p.ba]] as [string, number][]).map(([k, n]: [string, number]) => (
-            <span key={k} {...th(null, `${ITIP[k] ?? ''}\n持有數量：${n}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'help' }}>{ico(k, 28)}<b>{n}</b></span>
-          ))}
-          {(g.p.ab ?? 0) > 0 && <span {...th(null, `防爆卷軸\n強化失敗會爆裝時自動消耗 1 張，裝備保留、強化值不變。\n持有數量：${g.p.ab ?? 0}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'help' }}>{ico('sp', 28)}<b>{g.p.ab ?? 0}</b></span>}
-          {(g.p.rs ?? 0) > 0 && <span {...th(null, `洗鍊石\n紫色／金色武器與項鍊重新隨機詞綴（鍛造屋）\n持有數量：${g.p.rs ?? 0}`)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'help' }}>{ico('rk', 28)}<b>{g.p.rs ?? 0}</b></span>}
-          {(g.p.cpn ?? 0) > 0 && <span {...th(null, `${CPN[g.p.cls] ?? ''}\n${CPD[g.p.cls] ?? ''}\n持有數量：${g.p.cpn ?? 0}\n點一下使用`)} onClick={() => { drinkCp(g, false); bump(); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>{ico(`pk${g.p.cls}`, 28)}<b>{g.p.cpn ?? 0}</b></span>}
-          {xs.map((n: number, i: number) => n > 0 ? <span key={`x${i}`} {...th(null, `${xsName(i)}\n持有數量：${n}\n點一下使用`)} onClick={() => { setMsg({ t: useXs(g, i), ok: true }); bump(); }} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>{ico(`se${Math.floor(i / 3) + 1}`, 28)}<b>{n}</b><span style={{ fontSize: 9, opacity: 0.7 }}>{XSM[i % 3]}分</span></span> : null)}
-        </div>
         <div style={rowS}><button style={sb} onClick={() => { recall(g); bump(); }}>使用回城卷軸</button><button style={sb} onClick={() => { drinkGreen(g, false); bump(); }}>喝綠水</button><button style={sb} onClick={() => { g.p.inv.sort((a: Item, b: Item) => idf(a).s - idf(b).s || itemScore(b) - itemScore(a)); bump(); }}>整理</button><button style={{ ...sb, color: '#a0ffa0' }} onClick={() => { const n = equipBest(g); addLog(g, n > 0 ? `一鍵穿最好：換上了 ${n} 件評分更高的裝備。` : '身上已經是評分最高的裝備了。', n > 0 ? '#a0ffa0' : '#c0c8d0'); bump(); }}>一鍵穿最好</button></div>
         <div style={{ ...rowS, flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 12, opacity: 0.8 }}>一鍵販賣：</span>
           {QN.map((n: string, q: number) => <label key={n} style={{ fontSize: 12, color: QC[q] ?? '#fff', display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}><input type="checkbox" checked={SELLQ[q] ?? false} onChange={() => { SELLQ[q] = !SELLQ[q]; bump(); }} />{n.slice(0, 1)}</label>)}
           <button style={{ ...sb, color: '#ffd860' }} {...fast(() => { const r = sellByQ(g); setBagSel(-1); addLog(g, r[0] > 0 ? `一鍵販賣 ${r[0]} 件，獲得 ${r[1]} 金幣。` : '沒有符合勾選品質的物品（已裝備的不會賣）。', '#ffd860'); bump(); })}>賣出（{sellList(g).length} 件）</button>
         </div>
-        <div style={{ display: 'flex', gap: 6, margin: '8px 0 4px' }}>{tabB(0, `背包 ${g.p.inv.length}/${cap}`)}{tabB(1, '合成')}</div>
+        <div style={{ display: 'flex', gap: 6, margin: '8px 0 4px' }}>{tabB(0, `背包 ${used}/${cap}`)}{tabB(1, '合成')}</div>
         {bagTab === 1 ? synView() : (
           <div>
             <div style={{ ...subS, marginBottom: 4 }}>{touch ? '點物品查看並裝備，再點一次取消選取。' : '點物品查看、點兩下直接裝備，也可以拖到左邊的裝備欄。'}邊框顏色代表品質，比較請看「評分」。</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 40px)', gap: 3, maxHeight: 264, overflowY: 'auto', padding: 4, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(232,200,112,0.35)', borderRadius: 6, justifyContent: 'center' }}>
-              {Array.from({ length: Math.max(cap, g.p.inv.length) }, (_u: unknown, i: number) => { const it = g.p.inv[i]; if (!it) return <div key={`e${i}`} style={cellS} />; const ok = clsOk(idf(it), g.p.cls), on = bagSel === it.id; return (
+              {stk.map((o: { k: string; ic: string; n: number; t: string; f?: () => void; s?: string }) => (
+                <div key={`s${o.k}`} {...th(null, o.t)} onClick={() => { if (o.f) { o.f(); bump(); } }} style={{ ...cellS, position: 'relative', cursor: o.f ? 'pointer' : 'help', borderColor: 'rgba(160,200,255,0.35)' }}>{ico(o.ic, 34)}<span style={{ position: 'absolute', right: 1, bottom: 0, fontSize: 10, fontWeight: 800, color: '#ffffff', textShadow: '0 0 2px #000, 0 0 2px #000' }}>{o.n > 9999 ? `${Math.floor(o.n / 1000)}k` : o.n}</span>{o.s ? <span style={{ position: 'absolute', left: 1, top: -1, fontSize: 8, color: '#ffe08a', textShadow: '0 0 2px #000' }}>{o.s}</span> : null}</div>
+              ))}
+              {Array.from({ length: Math.max(cap - stk.length, g.p.inv.length) }, (_u: unknown, i: number) => { const it = g.p.inv[i]; if (!it) return <div key={`e${i}`} style={cellS} />; const ok = clsOk(idf(it), g.p.cls), on = bagSel === it.id; return (
                 <div key={it.id} {...th(it)} draggable={ok} onDragStart={(e: { dataTransfer: DataTransfer }) => { e.dataTransfer.setData('text', String(it.id)); }} onClick={() => setBagSel(on ? -1 : it.id)} onDoubleClick={() => { if (ok) { equip(g, it); setBagSel(-1); bump(); } }} style={{ ...cellS, cursor: 'pointer', borderColor: on ? '#ffe08a' : (it.q ?? 0) > 0 ? hexA(QC[it.q ?? 0] ?? '#ffffff', 0.85) : 'rgba(255,255,255,0.22)', boxShadow: on ? '0 0 8px #ffe08a' : (it.q ?? 0) >= 4 ? `0 0 6px ${QC[it.q ?? 0] ?? '#fff'}` : 'none', opacity: ok ? 1 : 0.6 }}>{ico(iconKey(it), 34, it.en, it.q)}{idf(it).r ? <span style={{ position: 'absolute', right: 1, top: -2, fontSize: 9, color: '#ffb060' }}>★</span> : null}</div>); })}
             </div>
             {sel && (() => { const d = idf(sel), ok = clsOk(d, g.p.cls), hb2 = canEnch(d) && (d.s === 0 ? g.p.bw : g.p.ba) > 0; return (
@@ -6698,7 +6796,7 @@ export default function App() {
                 {g.p.bank.map((it: Item) => (
                   <div key={it.id} {...th(it)} style={rowS}>{ico(iconKey(it), 30, it.en, it.q)}<div style={{ flex: '1 1 130px' }}><div style={{ color: itemCol(it) }}>{itemName(it)}</div><div style={subS}>{itemDesc(it)}</div></div><button style={sb} onClick={() => { bankOut(g, it); persist(g); bump(); }}>取出</button></div>
                 ))}
-                <div style={sec}>背包 {g.p.inv.length}/{invCap(g.p)}</div>
+                <div style={sec}>背包 {invUsed(g.p)}/{invCap(g.p)}</div>
                 {g.p.inv.map((it: Item) => (
                   <div key={it.id} {...th(it)} style={rowS}>{ico(iconKey(it), 30, it.en, it.q)}<div style={{ flex: '1 1 130px' }}><div style={{ color: itemCol(it) }}>{itemName(it)}</div><div style={subS}>{itemDesc(it)}</div></div><button style={sb} onClick={() => { bankIn(g, it); persist(g); bump(); }}>存入</button></div>
                 ))}
@@ -6995,6 +7093,20 @@ export default function App() {
                     </div>
                   ))}
                   <div style={{ ...rowS, padding: '4px 0' }}><span style={{ color: '#a8ecff', fontWeight: 800 }}>裝備總評分 {gearTotal(g.p).toLocaleString()}</span><span style={subS}>強化總值 +{enTotal(g.p)} · PvP 擊殺 {g.p.pk ?? 0}</span></div>
+                  {(() => { const pk = g.p.pk ?? 0, r = pvpRank(pk), nx = PVR[r + 1]; return (
+                    <div style={{ margin: '4px 0', padding: 6, borderRadius: 6, background: 'rgba(120,20,20,0.18)', border: '1px solid rgba(255,100,90,0.3)' }}>
+                      <div style={{ color: '#ff8a7a', fontWeight: 800 }}>擊殺聲望：{r >= 0 ? `⚔${PVR[r]?.n ?? ''}` : '尚無稱號'} <span style={subS}>（PvP 擊殺 {pk}）</span></div>
+                      <div style={subS}>{r >= 0 ? `目前加成：${pvText(r)}` : '擊殺其他玩家 10 名即可獲得第一個稱號。'}{nx ? ` · 下一稱號「${nx.n}」需要 ${nx.k} 殺（還差 ${nx.k - pk}）` : ' · 已達最高稱號'}</div>
+                      <div style={{ ...subS, fontSize: 10 }}>{PVR.map((t: { k: number; n: string }, i: number) => `${t.k}殺 ${t.n}${i === r ? '（目前）' : ''}`).join(' → ')}　稱號不疊加，只套用最高一個。</div>
+                    </div>); })()}
+                  {(() => { const lr = g.p.lr ?? 0, nx = lr < 80 ? lr + 5 : 0; return (
+                    <div style={{ margin: '4px 0' }}>
+                      <div style={sec}>等級獎勵 <span style={subS}>（每 5 級自動發放 · 已領到 Lv.{lr}{nx ? ` · 下一個 Lv.${nx}` : ' · 全部領取完畢'}）</span></div>
+                      <div style={{ maxHeight: 150, overflowY: 'auto', fontSize: 11 }}>
+                        {Object.keys(LVR).map((k: string) => Number(k)).sort((a: number, b: number) => a - b).map((lv: number) => { const got = lv <= lr, nxt = lv === nx; return (
+                          <div key={lv} style={{ display: 'flex', gap: 6, padding: '2px 0', color: got ? '#8fb89a' : nxt ? '#ffe08a' : '#eef2f8', opacity: got ? 0.75 : 1 }}><b style={{ width: 40, flex: '0 0 auto' }}>Lv.{lv}</b><span style={{ width: 44, flex: '0 0 auto' }}>{got ? '✔已領' : nxt ? '▶下一個' : '未達成'}</span><span style={{ flex: '1 1 auto' }}>{lvrText(lv, g.p.cls)}</span></div>); })}
+                      </div>
+                    </div>); })()}
                   <div style={sec}>戰鬥數值</div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', fontSize: 12 }}>
                     {(() => { const nb = noBuff(g.p), ai = atkInt(g.p, true), an = atkInt(g.p, false); return <>
